@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f6f5ef">
+  <script>
+    // Apply before styles load so a saved dark theme never flashes light.
+    (() => {
+      let preference = 'system';
+      try { const saved = localStorage.getItem('form.theme'); if (['light', 'dark', 'system'].includes(saved)) preference = saved; } catch { /* Use device theme when storage is unavailable. */ }
+      const theme = preference === 'system' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : preference;
+      document.documentElement.dataset.themePreference = preference;
+      document.documentElement.dataset.theme = theme;
+      document.querySelector('meta[name="theme-color"]').content = theme === 'dark' ? '#131a17' : '#f6f5ef';
+      try {
+        const colors = JSON.parse(localStorage.getItem('form.colors'));
+        if (colors && ['background', 'foreground'].every(key => typeof colors[key] === 'number' && Number.isFinite(colors[key]))) {
+          document.documentElement.dataset.customColors = 'true';
+          for (const key of ['background', 'foreground']) document.documentElement.style.setProperty(`--${key}-hue`, Math.max(0, Math.min(359, Math.round(colors[key]))));
+          const hue = document.documentElement.style.getPropertyValue('--background-hue');
+          const brightness = typeof colors.brightness === 'number' && Number.isFinite(colors.brightness) ? Math.max(0, Math.min(100, Math.round(colors.brightness))) : 50;
+          const offset = (brightness - 50) * (theme === 'dark' ? .18 : .08);
+          document.documentElement.style.setProperty('--brightness-offset', `${offset}%`);
+          document.querySelector('meta[name="theme-color"]').content = `hsl(${hue}, ${theme === 'dark' ? 18 : 20}%, ${(theme === 'dark' ? 9 : 96) + offset}%)`;
+        }
+      } catch { /* Keep defaults if color preferences are unavailable. */ }
+    })();
+  </script>
+  <meta name="description" content="A quiet place to track your training. Routines, set-by-set history, and offline workout logging.">
+  <title>Form: Your training log</title>
+  <link rel="icon" type="image/svg+xml" href="./icons/mark.svg">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./js/app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <aside class="sidebar">
+    <a class="brand" href="#routines" aria-label="Form home"><span class="brand-symbol" aria-hidden="true">f<span>↗</span></span><span>form<span class="brand-dot">.</span></span></a>
+    <span class="brand-caption">YOUR TRAINING LOG</span>
+    <nav aria-label="Main navigation">
+      <a href="#routines" data-view="routines"><span aria-hidden="true">▦</span> Routines</a>
+      <a href="#exercises" data-view="exercises"><span aria-hidden="true">☰</span> Exercises</a>
+      <a href="#history" data-view="history"><span aria-hidden="true">◷</span> History</a>
+      <a href="#progress" data-view="progress"><span aria-hidden="true">▥</span> Progress</a>
+      <a href="#settings" data-view="settings"><span aria-hidden="true">⚙</span> Settings</a>
+    </nav>
+    <div class="sidebar-bottom"><span class="status-dot"></span><span id="connection">Checking connection</span></div>
+  </aside>
+  <div class="workspace">
+    <header class="topbar"><a class="mobile-brand" href="#routines" aria-label="Form home">form.</a><span>Training log</span><div><span class="unit-tag">KG</span><span id="today"></span></div></header>
+    <div id="update-banner" class="notice" hidden><span>A new version is ready.</span><button type="button" id="apply-update" class="button small">Save & update</button></div>
+    <div id="resume-banner" class="notice" hidden></div>
+    <main id="main" tabindex="-1"><div class="loading">Opening your training log…</div></main>
+    <footer class="page-footer"><span>Stored on this device</span><span>Back up from Settings</span></footer>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <dialog id="modal"><div id="modal-content"></div></dialog>
+</body>
+</html>

@@ -1,0 +1,7 @@
+node_modules/
+test-results/
+dist/
+.netlify/
+.env
+.env.*
+.DS_Store

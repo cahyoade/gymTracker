@@ -1,0 +1,28 @@
+{
+  "name": "form-gym-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test:deployment": "node tests/deployment-browser.mjs",
+    "dev": "node scripts/serve.mjs",
+    "dev:lan": "node scripts/serve.mjs --lan",
+    "test": "node --test tests/unit.test.js tests/records.test.js tests/progression.test.js tests/measurements.test.js tests/catalog.test.js tests/strength.test.js",
+    "test:strength": "node tests/strength-browser.mjs",
+    "test:catalog": "node tests/catalog-browser.mjs",
+    "test:lan": "node tests/lan-browser.mjs",
+    "test:measurements": "node tests/measurements-browser.mjs",
+    "test:design": "node tests/design-browser.mjs",
+    "test:progression": "node tests/progression-browser.mjs",
+    "test:browser": "node tests/browser.mjs",
+    "test:google": "node tests/google-browser.mjs",
+    "test:records": "node tests/records-browser.mjs",
+    "test:theme": "node tests/theme-browser.mjs",
+    "test:colors": "node tests/colors-browser.mjs",
+    "test:hover": "node tests/hover-browser.mjs",
+    "test:palette": "node tests/palette-browser.mjs",
+    "test:audit": "node tests/feature-audit.mjs",
+    "test:layout": "node tests/layout.mjs"
+  }
+}

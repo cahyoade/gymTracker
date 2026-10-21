@@ -1,0 +1,33 @@
+import assert from 'node:assert/strict';
+import { pathToFileURL } from 'node:url';
+const { chromium }=await import(process.env.PLAYWRIGHT_MODULE ? pathToFileURL(process.env.PLAYWRIGHT_MODULE).href : 'playwright');
+const origin=process.env.APP_URL;
+if(!origin)throw new Error('Set APP_URL to the LAN HTTP address of the --lan server.');
+const browser=await chromium.launch({headless:true,...(process.env.BROWSER_PATH?{executablePath:process.env.BROWSER_PATH}:{})});
+const context=await browser.newContext({viewport:{width:390,height:844},acceptDownloads:true});
+const page=await context.newPage();page.setDefaultTimeout(10000);
+const errors=[];page.on('pageerror',error=>errors.push(error.message));
+const action=name=>page.locator(`[data-action="${name}"]`);
+try {
+  for(const path of ['/','/styles.css','/js/model.js','/data/exercises.json','/data/EXERCISES-LICENSE.txt'])assert.equal((await context.request.get(origin+path)).status(),200,path);
+  for(const path of ['/README.md','/test-results/catalog-mobile.png','/tests/unit.test.js','/scripts/serve.mjs','/.git/config'])assert.equal((await context.request.get(origin+path)).status(),403,path);
+  await page.goto(origin);await action('new-routine').waitFor();
+  assert.equal(await page.evaluate(()=>isSecureContext),false);
+  assert.equal(await page.evaluate(()=>typeof crypto.randomUUID),'undefined');
+  await action('new-routine').click();await page.locator('#routine-name').fill('Phone preview');
+  await page.locator('#routine-exercise').selectOption('seed-bench-press');await action('editor-add').click();
+  await page.getByRole('button',{name:'Save routine',exact:false}).click();await action('start').click();
+  const row=page.locator('.set-row').first();
+  await row.locator('[data-field="weight"]').fill('20');await row.locator('[data-field="reps"]').fill('10');await row.locator('[data-field="completed"]').check();
+  await page.waitForFunction(()=>document.querySelector('#save-status')?.textContent==='Saved on this device');
+  await page.reload();await action('resume').click();assert.equal(await row.locator('[data-field="reps"]').inputValue(),'10');
+  await action('finish-workout').click();await page.locator('.history-card').waitFor();
+  await page.locator('nav [data-view="exercises"]').click();await action('browse-catalog').click();await page.locator('.catalog-item').first().waitFor();
+  await page.getByRole('button',{name:'Close dialog',exact:true}).click();
+  await page.locator('nav [data-view="settings"]').click();
+  await page.getByText('Google sign-in needs HTTPS or localhost. File backups are available on this network preview.',{exact:true}).waitFor();
+  assert.match(await page.locator('#offline-status').textContent(),/needs HTTPS or localhost/);
+  assert.equal(await page.locator('script[src*="accounts.google.com"]').count(),0);
+  assert.deepEqual(errors,[]);
+  console.log('PASS LAN HTTP: public-only assets, cryptographic UUID fallback, routine creation, saved/reloaded workout, completion, exercise library and clear HTTPS-only feature messages');
+} finally {await context.close();await browser.close();}
