@@ -47,18 +47,18 @@ try {
   const upgraded=await read();
   assert.deepEqual(upgraded.exercises,[...original.exercises].sort((a,b)=>a.id.localeCompare(b.id)));
   assert.deepEqual(upgraded.sessions,[original.draft]);assert.deepEqual(upgraded.bodyMeasurements,[]);
-  assert.equal(upgraded.state.revision,7);assert.equal(upgraded.state.backedUpRevision,7);
+  assert.equal(upgraded.state.revision,8);assert.equal(upgraded.state.backedUpRevision,7);
   assert.deepEqual(upgraded.recovery.snapshot,original.oldSnapshot);
-  assert.equal(await page.evaluate(async()=>(await(await import('./js/db.js')).openDB()).version),2);
+  assert.equal(await page.evaluate(async()=>(await(await import('./js/db.js')).openDB()).version),3);
   await page.evaluate(()=>navigator.serviceWorker.ready);await page.waitForFunction(()=>Boolean(navigator.serviceWorker.controller));
-  console.log('PASS database v1-to-v2 upgrade preserves exercises, routines, draft, preferences, backup status and recovery');
+  console.log('PASS database v1-to-v3 upgrade preserves exercises, routines, draft, preferences and recovery, and marks the new food library unbacked-up');
 
   await add('2026-10-02','75','32','20');await add('2026-10-09','76','33.5','19.4');await add('2026-10-16','76.2');
   assert.equal(await page.locator('.measurement-card').count(),3);
   assert.match(await page.locator('[aria-label="Latest muscle mass"]').textContent(),/33.5/);
   assert.match(await page.locator('[aria-label="Latest body fat"]').textContent(),/-0.6 percentage points/);
   assert.equal((await read()).bodyMeasurements.find(item=>item.date==='2026-10-16').muscleMass,null);
-  assert.deepEqual((await read()).sessions,[original.draft]);assert.equal((await read()).state.revision,10);
+  assert.deepEqual((await read()).sessions,[original.draft]);assert.equal((await read()).state.revision,11);
   await page.locator('#body-metric').selectOption('muscleMass');assert.match(await page.locator('.body-chart').getAttribute('aria-label'),/Muscle mass trend/);
   await context.setOffline(true);await page.reload();await page.locator('.measurement-card').first().waitFor();
   assert.equal(await page.locator('.measurement-card').count(),3);assert.deepEqual((await read()).sessions,[original.draft]);
@@ -86,7 +86,7 @@ try {
 
   await context.setOffline(false);await nav('settings');const download=page.waitForEvent('download');await action('export').click();
   const exportPath=await(await download).path(), exported=JSON.parse(await readFile(exportPath,'utf8'));
-  assert.equal(exported.schemaVersion,2);assert.equal(exported.bodyMeasurements.length,4);
+  assert.equal(exported.schemaVersion,3);assert.equal(exported.bodyMeasurements.length,4);
   const beforeRestore=await read();
   const invalid=structuredClone(exported);invalid.bodyMeasurements[0].bodyFat=101;
   await page.locator('#import-file').setInputFiles({name:'invalid-measurements.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(invalid))});
@@ -113,7 +113,7 @@ try {
       await page.setViewportSize({width,height:1050});
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
       assert.equal(await page.evaluate(()=>[...document.querySelectorAll('nav a')].every(node=>node.getBoundingClientRect().width>=44)),true);
-      assert.equal(await page.locator('nav [data-view]').count(),5);
+      assert.equal(await page.locator('nav [data-view]').count(),6);
       await action('new-measurement').first().click();
       assert.equal(await page.evaluate(()=>{const dialog=document.querySelector('dialog');return dialog.scrollWidth<=dialog.clientWidth;}),true);
       await action('close-modal').last().click();await closed();
@@ -123,5 +123,5 @@ try {
   await page.setViewportSize({width:390,height:1050});await page.screenshot({path:'test-results/body-progress-mobile.png',fullPage:true});
   await page.setViewportSize({width:1440,height:1000});await page.screenshot({path:'test-results/body-progress-desktop.png',fullPage:true});
   assert.deepEqual(errors,[]);
-  console.log('PASS light/dark measurement view, charts, five-item navigation, and editor at mobile/tablet/desktop widths');
+  console.log('PASS light/dark measurement view, charts, six-item navigation, and editor at mobile/tablet/desktop widths');
 }finally{await context.close();await browser.close();}

@@ -30,10 +30,10 @@ test('latest and change use each metric’s actual dated readings without interp
   assert.deepEqual(records,before);
 });
 test('current backups round trip and legacy backups migrate to empty body history',()=>{
-  const value=backup();assert.deepEqual(validateBackup(JSON.stringify(value)),value);
+  const value=validateBackup(backup());assert.deepEqual(validateBackup(JSON.stringify(value)),value);
   const legacy=backup();legacy.schemaVersion=1;delete legacy.bodyMeasurements;
   const migrated=validateBackup(legacy);
-  assert.equal(migrated.schemaVersion,2);assert.deepEqual(migrated.bodyMeasurements,[]);
+  assert.equal(migrated.schemaVersion,3);assert.deepEqual(migrated.bodyMeasurements,[]);
   assert.equal(legacy.bodyMeasurements,undefined);
 });
 test('invalid measurement backups reject duplicates, dates and values before replacement',()=>{

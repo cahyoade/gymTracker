@@ -67,6 +67,16 @@ The charts derive directly from completed workout records: drafts, unperformed s
 
 Open **Next session** on an exercise or **Targets & explanation** in a workout. Suggestions use your routine’s rep range and completed history: aim for one more total rep, confirm the top of the range, then consider a small equipment-supported load increase. Set your available increment in the explanation dialog (default 2.5 kg). Suggestions stay separate from your actual set inputs.
 
+## Food and warteg meals
+
+Open **Food → Add meal** to build an empty plate from 19 everyday foods, grouped into Nasi & mi, Lauk, Sayur and Extras. Tap a dish to add one base serving, adjust by halves or enter another quantity. Gram/ml entry appears only when a conversion is known. Search or choose Selected to focus on the current plate. Every meal starts empty; there are no saved plate templates or automatic meal records.
+
+The running totals estimate calories, protein, carbohydrate and fat. **Log meal** atomically saves the chosen items; unfinished meals autosave separately and survive offline reloads without entering daily totals. Resume from Food. Save & close keeps an unfinished draft; Discard removes only that draft. Edit or delete logged meals as needed. Manage foods supports custom foods, editing and archiving; historical meals retain their original names, portions, source notes and nutrient values.
+
+Initial calorie/protein estimates and targets (2,500 kcal; 120–135 g protein) are user-supplied and editable. Research added carbohydrate/fat estimates for cooked rice, a large boiled egg and whole milk, with source links and portion assumptions in Estimate details. Other prepared dishes lack suitable verified serving matches and retain unknown macros. Unknown is not zero; incomplete totals say Partial. All values remain estimates and can be replaced with labels or measured portions. Sources and implementation details are in [NUTRITION_PLAN.md](NUTRITION_PLAN.md).
+
+Mark a food day Complete when logging is finished. Subsequent meal changes reopen it. **Progress → Nutrition** offers 7-, 30- and 90-day charts, effective-dated targets, per-food breakdowns, and 20 dated records at a time with Show more. Averages use completed days with complete values for the selected nutrient and show coverage; unlogged days are gaps and unfinished days remain provisional. No exercise calories are subtracted from intake. Existing body and strength records remain available.
+
 Skipped sets, changed plans, mixed loads, bodyweight logging, missed minimum reps and long gaps receive contextual guidance instead of a forced weight increase. History corrections, deletions and restores recalculate the advice. The entire feature works offline; no account or network service is involved. **Settings → Training guidance** explains the rules and links the research, including the 2026 ACSM position stand. The precise thresholds are app heuristics, not a validated prediction model. See [PROGRESSION.md](PROGRESSION.md) for research, limitations, and verification commands.
 
 ## Appearance
@@ -85,13 +95,15 @@ The app requests persistent storage when supported. Browser storage is tied to t
 
 ## Backup and restore
 
-- **Export backup** downloads a JSON snapshot including exercises, routines, session history, the active draft, and workout preferences.
+- **Export backup** downloads a JSON snapshot including exercises, routines, session history, body measurements, foods, meals, food-day states, targets, both unfinished drafts, and workout preferences.
 - **Import file** validates the entire snapshot and previews its date and record counts before asking to replace local data.
 - Every restore atomically saves the current dataset as a **recovery copy** before replacement. Settings can restore or export that copy. There is one recovery copy; the next restore replaces it with the dataset being replaced.
 - Google Drive uses explicit backups and restores, not automatic synchronization. Before switching devices, back up on the first device and restore on the second. Independent records on two devices are not merged.
 - Google OAuth IDs and tokens are excluded from exports. Tokens exist only in memory. File-export timestamps describe when a download was prepared; the browser controls whether it is saved.
 
-Backup format version 2 has `schemaVersion`, `exportedAt`, `exercises`, `routines`, `sessions`, `bodyMeasurements`, and `workoutPreferences`. Version 1 files migrate to version 2 with empty body history. Current-format files require a valid body-measurement list; malformed values, duplicate IDs/dates, and unsupported versions are rejected before replacement. IndexedDB `form-training` version 2 adds the `bodyMeasurements` store and unique date index while retaining the `exercises`, `routines`, `sessions`, and `metadata` stores. Upgrade does not reseed or overwrite existing records. Older app releases cannot import version 2 exports; update the app on each receiving device first.
+Backup format version 3 has `schemaVersion`, `exportedAt`, `exercises`, `routines`, `sessions`, `bodyMeasurements`, `workoutPreferences`, `foods`, `foodMeals`, `foodDays`, `nutritionTargets`, and `foodDraft`. Versions 1 and 2 remain importable: version 1 lacks body history; both lack nutrition history. Their restore preview explains that current meal records will be replaced by empty history, the starter food library and default targets. The recovery copy retains the records being replaced. Current-format imports validate all nutrition data before replacement.
+
+IndexedDB `form-training` version 3 retains existing stores and adds `foods`, date-indexed `foodMeals` and `foodDays`. Effective-dated targets and the meal draft live in metadata. Migration seeds the food library once, preserves training/body records, and marks the added data as unbacked-up. Subsequent launches never overwrite edited or archived foods. Older app releases cannot import version 3 exports; update each receiving device first.
 
 ## Configure optional Google Drive
 

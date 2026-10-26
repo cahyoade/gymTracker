@@ -60,7 +60,10 @@ try {
   await action('browse-catalog').click();
   await page.locator('.catalog-item').first().waitFor();
   await page.getByRole('button',{name:'Close dialog',exact:true}).click();
-  for (const view of ['progress','settings','exercises','routines']) {
+  await page.locator('nav [data-view="food"]').click();
+  await action('nut-new').click();await page.locator('[data-action="nut-add"][data-id="food-rice"]').click();await action('nut-log').click();await page.locator('.meal-card').waitFor();
+  assert.match(await page.locator('.meal-card').innerText(),/130/);
+  for (const view of ['progress','settings','exercises','food','routines']) {
     await page.locator(`nav [data-view="${view}"]`).click();
     await page.locator('main h1').waitFor();
   }

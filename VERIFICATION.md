@@ -2,6 +2,12 @@
 
 Checked in isolated Chromium/Edge browser contexts with disposable datasets. The user's workout records were not used or modified during testing.
 
+## Food and warteg meals — 26 October 2026
+
+Cache version `form-shell-v2.0.1`; IndexedDB and backup format version 3. Added 19 foods, empty-plate assembly, fractional servings and known conversions, independent saved meal drafts, atomic meal commits, food editing/archiving, effective-dated targets, complete-day states and Nutrition in Progress. Missing macros retain null values and partial coverage. Researched estimates are limited to suitable cooked rice, boiled egg and whole milk references, with assumptions/source links. Existing workout/body data survives migration.
+
+Verified **76 unit tests**, **eight nutrition browser scenarios**, **ten core workout scenarios**, **five body-measurement scenarios**, **five mocked Google/Drive scenarios**, **five strength scenarios with 32 design states**, **208 rendered design states**, and **222 palette-token/72 rendered-color checks**. Nutrition browser checks include v2 migration, reference totals (2,169 kcal/103 g and 980 kcal/56 g), offline draft resume, corrections, archive snapshots, historical targets, old-file previews, schema-3 round trips, legacy recovery, atomic aborts, simulated disk failure/retry, keyboard portions/focus, app updates with both drafts, bounded 90-day history, and eight mobile/desktop custom-theme states. The packaged offline-app check covers nutrition logging too. Actual Google account consent/Drive access and physical Android installation remain external checks.
+
 ## Netlify production package — 21 October 2026
 
 Added a dependency-free copy build and `netlify.toml` for GitHub continuous deployment: Node 24 runs the unit tests, builds, and publishes only `dist/`. The build validates service-worker asset coverage and retains both license notices. Stable asset filenames revalidate through HTTP while the existing worker retains offline caching and explicit updates.

@@ -1,6 +1,8 @@
 import { SCHEMA_VERSION, validateSet, validateRoutine, id } from './model.js';
 import { loadGoogleLibrary } from './google.js';
 import { validateMeasurement } from './measurements.js';
+import { validateNutrition } from './nutrition.js';
+import { SEED_FOODS } from './food-seeds.js';
 
 const check = (condition, message) => { if (!condition) throw new Error(`Invalid backup: ${message}`); };
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -19,7 +21,7 @@ function records(value, label) {
 export function validateBackup(input) {
   const backup = typeof input === 'string' ? JSON.parse(input) : structuredClone(input);
   check(object(backup), 'expected a JSON object.');
-  check([1, SCHEMA_VERSION].includes(backup.schemaVersion), 'this file uses an unsupported format version.');
+  check([1, 2, SCHEMA_VERSION].includes(backup.schemaVersion), 'this file uses an unsupported format version.');
   check(date(backup.exportedAt), 'missing export date.');
   const exerciseIds = records(backup.exercises, 'exercises');
   records(backup.routines, 'routines');
@@ -81,10 +83,13 @@ export function validateBackup(input) {
     check(!measurementDates.has(record.date), 'body measurements contain duplicate dates.');
     measurementDates.add(record.date);
   }
+  const nutrition=validateNutrition(backup,{legacy:backup.schemaVersion<3});
+  if(backup.schemaVersion<3)nutrition.foods=structuredClone(SEED_FOODS);
   return {
     schemaVersion: SCHEMA_VERSION, exportedAt: backup.exportedAt,
     exercises: backup.exercises, routines: backup.routines, sessions: backup.sessions,
     bodyMeasurements,
+    ...nutrition,
     workoutPreferences: { unit: 'kg' }
   };
 }
@@ -182,5 +187,10 @@ export class DriveBackup {
     } catch { cleanupWarning = true; }
     return { ...uploaded, cleanupWarning };
   }
-  async read(fileId) { return validateBackup(await this.api(`files/${encodeURIComponent(fileId)}?alt=media`)); }
+  async read(fileId,{raw=false}={}) {
+    const source=await this.api(`files/${encodeURIComponent(fileId)}?alt=media`);
+    const normalized=validateBackup(source);
+    // Restore previews need the original version to explain legacy replacement.
+    return raw?source:normalized;
+  }
 }

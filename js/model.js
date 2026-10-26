@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 export const SEED_EXERCISES = [
   ['Squat', 'Legs'], ['Bench press', 'Chest'], ['Deadlift', 'Back'],
   ['Overhead press', 'Shoulders'], ['Row', 'Back'], ['Lat pulldown', 'Back'],

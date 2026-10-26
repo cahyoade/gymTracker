@@ -12,6 +12,7 @@ import { loadCatalog } from './catalog.js';
 import { catalogFilters, catalogResults, catalogDetails } from './catalog-ui.js';
 import { strengthProgress } from './strength.js';
 import { strengthView } from './strength-progress-ui.js';
+import { createNutritionController } from './nutrition-controller.js';
 
 const $ = selector => document.querySelector(selector);
 const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
@@ -20,7 +21,7 @@ const date = (value, options = {}) => new Date(value).toLocaleDateString(undefin
 const dateTime = value => value ? new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'Not yet';
 const main = $('#main');
 const modal = $('#modal');
-const views = ['routines', 'exercises', 'history', 'progress', 'settings'];
+const views = ['routines', 'exercises', 'history', 'food', 'progress', 'settings'];
 let data, draft = null, historyEdit = null, editor = null, pendingRestore = null;
 let view = views.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'routines';
 let workoutVisible = false, exerciseSearch = '', exerciseFilter = 'active', historyExercise = '';
@@ -41,6 +42,8 @@ let strengthState={};
 const progressionIncrements = new Map();
 let catalogItems=[],catalogDetailId=null;
 const catalogState={query:'',bodyPart:'',equipment:'',limit:24};
+const nutrition=createNutritionController({getData:()=>data,refresh,render,toast,showModal,closeModal,
+  openFood:async()=>{view='food';workoutVisible=false;location.hash='food';render();window.scrollTo(0,0);}});
 
 function toast(message, error = false) {
   const node = $('#toast');
@@ -94,6 +97,7 @@ async function persistDraft() {
 async function flushDraft() {
   clearTimeout(autosaveTimer);
   await persistDraft();
+  await nutrition.flush();
   // A user may have typed during the transaction. Persist the newer input too.
   if (draft && savedDraftRevision !== draftRevision) await flushDraft();
 }
@@ -115,6 +119,7 @@ function render() {
   else if (view === 'exercises') renderExercises();
   else if (view === 'history') renderHistory();
   else if (view === 'progress') renderProgress();
+  else if (view === 'food') main.innerHTML=nutrition.render();
   else renderSettings();
   if (!modal.open) main.focus({ preventScroll: true });
 }
@@ -170,6 +175,7 @@ function renderProgress() {
   const progress=strengthProgress(data.sessions,data.exercises,strengthState);
   strengthState={exerciseId:progress.exerciseId,metric:progress.metric,load:progress.load};
   main.innerHTML = progressView(data.bodyMeasurements, bodyMetric, measurementLimit,strengthView(progress));
+  $('#strength-progress').insertAdjacentHTML('afterend',nutrition.progress());
 }
 function updateStrength(focused) {
   const progress=strengthProgress(data.sessions,data.exercises,strengthState);
@@ -204,7 +210,7 @@ function renderSettings() {
   main.innerHTML = heading('', 'Settings & backup', 'Back up your records and manage this device.') + `
     <div class="settings-grid">
       <section class="settings-card"><h2>File backup</h2>
-        <p class="muted">Export routines, exercises, sessions, and body measurements. Import a backup to move your records to this device.</p>
+        <p class="muted">Export routines, exercises, sessions, body measurements, foods, meals, targets and unfinished meal drafts. Import a backup to move your records to this device.</p>
         <p>Last file export: <strong>${escape(dateTime(state.lastExportAt))}</strong></p>
         <div class="button-row"><button class="button" data-action="export">Export backup</button><button class="button secondary" data-action="import">Import file</button><input type="file" accept=".json,application/json" id="import-file" hidden></div>
       </section>
@@ -345,7 +351,7 @@ function modalHeader(context, title, showContext = false) {
   return `<div class="modal-heading"><div><h2 id="modal-title">${title}</h2>${showContext ? `<p class="small-text muted">${escape(context)}</p>` : ''}</div><button class="icon-button" data-action="close-modal" aria-label="Close dialog">×</button></div>`;
 }
 function formError(error) {
-  const node = modal.open ? $('#form-error') : null;
+  const node = modal.open ? $('#form-error') : $('#nut-error');
   if (node) { node.textContent = error.message; node.hidden = false; node.focus(); }
   else toast(error.message, true);
 }
@@ -440,11 +446,14 @@ function showProgressionResearch() {
 }
 function previewRestore(snapshot, source) {
   pendingRestore = validateBackup(snapshot);
+  const nutritionDetails=`<p>${pendingRestore.foods.length} saved foods · ${pendingRestore.foodMeals.length} logged meals · ${pendingRestore.foodDays.filter(day=>day.complete).length} complete food days${pendingRestore.foodDraft?' · includes an unfinished meal':''}</p>${snapshot.schemaVersion<3?'<p>This older backup contains no nutrition history. Restoring clears current meal history and loads the starter food collection and default targets.</p>':''}<p>Nutrition records and targets are replaced too; your current nutrition data is retained in the recovery copy.</p>`;
   const completed = snapshot.sessions.filter(session => session.status === 'completed').length;
   showModal(modalHeader('REVIEW BEFORE RESTORING', 'Bring your progress back.') + `<p class="muted">${escape(source)}</p><div class="restore-summary"><p>Exported <strong>${escape(dateTime(snapshot.exportedAt))}</strong></p><p><strong>${snapshot.exercises.length}</strong> exercises · <strong>${snapshot.routines.length}</strong> routines · <strong>${completed}</strong> completed sessions · <strong>${pendingRestore.bodyMeasurements.length}</strong> body measurements</p>${snapshot.sessions.some(session => session.status === 'draft') ? '<p>Includes an active workout draft.</p>' : ''}</div><p>This replaces the exercises, routines, history, active workout, and body measurements on this device. A backup with no body measurements clears the measurement list. Form will keep a recovery copy of your current data.</p><p id="form-error" class="form-error" role="alert" tabindex="-1" hidden></p><div class="modal-actions"><button class="button secondary" data-action="close-modal">Cancel</button><button class="button" data-action="confirm-restore">Replace & restore</button></div>`);
+  $('#modal-content .restore-summary')?.insertAdjacentHTML('beforeend',nutritionDetails);
 }
 
 async function handleAction(action, button) {
+  if(action.startsWith('nut-')) {await nutrition.action(action,button);return;}
   switch (action) {
     case 'new-measurement': openMeasurementEditor(); break;
     case 'edit-measurement': openMeasurementEditor(button.dataset.id); break;
@@ -582,6 +591,7 @@ async function handleAction(action, button) {
       await flushDraft();
       await replaceData(validateBackup(pendingRestore));
       await refresh(); draft = data.sessions.find(session => session.status === 'draft') || null;
+      nutrition.reset();
       draftRevision = savedDraftRevision = 0; historyEdit = null; saveError = null; workoutVisible = false;
       closeModal(); render(); toast('Backup restored. Your previous data is available in the recovery copy.'); break;
     }
@@ -601,7 +611,7 @@ async function handleAction(action, button) {
       toast(result.cleanupWarning ? 'Backup saved and verified. Older backups could not be cleaned up this time.' : 'Google Drive backup saved and verified.'); break;
     }
     case 'drive-list': driveFiles = await drive.list(); renderDriveFiles(); break;
-    case 'drive-restore': previewRestore(await drive.read(button.dataset.id), 'Google Drive backup'); break;
+    case 'drive-restore': previewRestore(await drive.read(button.dataset.id,{raw:true}), 'Google Drive backup'); break;
     case 'persistent-storage': {
       const persisted = await navigator.storage?.persist?.();
       $('#storage-status').textContent = persisted ? 'Persistent storage is enabled. Backups are still recommended.' : 'The browser did not grant persistent storage. Your app still works; keep regular backups.'; break;
@@ -634,6 +644,7 @@ document.addEventListener('click', async event => {
 
 document.addEventListener('input', event => {
   const target = event.target;
+  if(nutrition.input(target))return;
   if (target.hasAttribute('data-background-brightness')) {
     if (!Number.isFinite(target.valueAsNumber)) return;
     if (!setColorPreferences({ ...getColorPreferences(), brightness: target.valueAsNumber })) toast('Colors changed for this visit. Your browser could not remember the choice.', true);
@@ -668,6 +679,7 @@ document.addEventListener('input', event => {
 
 document.addEventListener('change', async event => {
   const target = event.target;
+  if(await nutrition.change(target))return;
   if(target.id==='strength-exercise') {strengthState={exerciseId:target.value};updateStrength(target.id);return;}
   if(target.id==='strength-metric') {strengthState.metric=target.value;updateStrength(target.id);return;}
   if(target.id==='strength-load') {strengthState.load=Number(target.value);updateStrength(target.id);return;}
@@ -682,7 +694,7 @@ document.addEventListener('change', async event => {
     if (!file) return;
     try {
       if (file.size > 25 * 1024 * 1024) throw new Error('Choose a backup smaller than 25 MB.');
-      previewRestore(validateBackup(await file.text()), `File: ${file.name}`);
+      previewRestore(JSON.parse(await file.text()), `File: ${file.name}`);
     } catch (error) { toast(error.message, true); }
     return;
   }
@@ -713,13 +725,14 @@ document.addEventListener('change', async event => {
 });
 
 document.addEventListener('submit', async event => {
-  if (!['routine-form', 'exercise-form', 'measurement-form'].includes(event.target.id)) return;
+  if (!['routine-form', 'exercise-form', 'measurement-form','nut-food-form','nut-target-form'].includes(event.target.id)) return;
   event.preventDefault();
   if (actionBusy) return;
   actionBusy = true;
   const button = event.target.querySelector('[type="submit"]');
   button.disabled = true;
   try {
+    if(event.target.id.startsWith('nut-')) {await nutrition.submit(event.target);return;}
     if (event.target.id === 'measurement-form') {
       const form = new FormData(event.target);
       const record = validateMeasurement({ id:event.target.dataset.id || id(), date:form.get('date'), weight:form.get('weight'), muscleMass:form.get('muscleMass'), bodyFat:form.get('bodyFat'), updatedAt:now() });
@@ -755,11 +768,11 @@ window.addEventListener('colorschange', updateColorControls);
 window.addEventListener('offline', () => { setConnection(); updateDriveControls(); });
 window.addEventListener('beforeinstallprompt', event => { event.preventDefault(); installPrompt = event; if (view === 'settings' && !workoutVisible) renderSettings(); });
 window.addEventListener('beforeunload', event => {
-  if (historyEdit || saveError || saving || (draft && draftRevision !== savedDraftRevision)) {
+  if (historyEdit || saveError || saving || nutrition.dirty() || (draft && draftRevision !== savedDraftRevision)) {
     event.preventDefault(); event.returnValue = '';
   }
 });
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && draft) flushDraft().catch(() => {}); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushDraft().catch(() => {}); });
 
 async function setupOffline() {
   if (!('serviceWorker' in navigator)) {

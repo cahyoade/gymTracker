@@ -29,7 +29,7 @@ function session(completedPositions = [1, 3], routineId = 'routine-a') {
   return finishSession(draft);
 }
 function backup() {
-  return { schemaVersion: 2, bodyMeasurements: [], exportedAt: timestamp, exercises: structuredClone(SEED_EXERCISES), routines: [routine()], sessions: [session()], workoutPreferences: { unit: 'kg' } };
+  return validateBackup({ schemaVersion: 2, bodyMeasurements: [], exportedAt: timestamp, exercises: structuredClone(SEED_EXERCISES), routines: [routine()], sessions: [session()], workoutPreferences: { unit: 'kg' } });
 }
 
 test('new drafts snapshot routine details and leave every set blank', () => {

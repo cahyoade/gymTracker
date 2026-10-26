@@ -1,7 +1,9 @@
 import { SEED_EXERCISES, SCHEMA_VERSION, now } from './model.js';
 import { catalogExercise, findCatalogExercise } from './catalog.js';
+import { SEED_FOODS } from './food-seeds.js';
+import { DEFAULT_TARGETS, validateMeal, validateDay } from './nutrition.js';
 
-const STORES = ['exercises', 'routines', 'sessions', 'metadata', 'bodyMeasurements'];
+const STORES = ['exercises', 'routines', 'sessions', 'metadata', 'bodyMeasurements', 'foods', 'foodMeals', 'foodDays'];
 let opening;
 let writeQueue = Promise.resolve();
 const request = req => new Promise((resolve, reject) => {
@@ -17,13 +19,21 @@ const done = tx => new Promise((resolve, reject) => {
 export function openDB() {
   if (opening) return opening;
   opening = new Promise((resolve, reject) => {
-    const req = indexedDB.open('form-training', 2);
+    const req = indexedDB.open('form-training', 3);
     req.onupgradeneeded = event => {
       const database = req.result;
       for (const name of STORES) if (!database.objectStoreNames.contains(name)) database.createObjectStore(name, { keyPath: 'id' });
       const tx = req.transaction;
       const bodyStore = tx.objectStore('bodyMeasurements');
       if (!bodyStore.indexNames.contains('date')) bodyStore.createIndex('date', 'date', { unique:true });
+      for (const name of ['foodMeals','foodDays']) {
+        const store=tx.objectStore(name);if(!store.indexNames.contains('date'))store.createIndex('date','date');
+      }
+      if(event.oldVersion<3) {
+        for(const food of SEED_FOODS)tx.objectStore('foods').put(food);
+        tx.objectStore('metadata').put({id:'nutrition',targets:DEFAULT_TARGETS,draft:null});
+        if(event.oldVersion>0)tx.objectStore('metadata').get('state').onsuccess=event=>tx.objectStore('metadata').put({...event.target.result,id:'state',revision:(event.target.result?.revision||0)+1,changedAt:now()});
+      }
       if (event.oldVersion === 0) {
         for (const exercise of SEED_EXERCISES) tx.objectStore('exercises').put(exercise);
         tx.objectStore('metadata').put({ id: 'preferences', unit: 'kg' });
@@ -45,10 +55,12 @@ export async function readData() {
   const tx = database.transaction(STORES, 'readonly');
   const completed = done(tx);
   const reads = STORES.map(store => request(tx.objectStore(store).getAll()));
-  const [exercises, routines, sessions, metadata, bodyMeasurements] = await Promise.all(reads);
+  const [exercises, routines, sessions, metadata, bodyMeasurements, foods, foodMeals, foodDays] = await Promise.all(reads);
   await completed;
   return {
-    exercises, routines, sessions, bodyMeasurements,
+    exercises, routines, sessions, bodyMeasurements, foods, foodMeals, foodDays,
+    nutritionTargets: metadata.find(item=>item.id==='nutrition')?.targets || structuredClone(DEFAULT_TARGETS),
+    foodDraft: metadata.find(item=>item.id==='nutrition')?.draft || null,
     preferences: metadata.find(item => item.id === 'preferences') || { id: 'preferences', unit: 'kg' },
     state: metadata.find(item => item.id === 'state'),
     recovery: metadata.find(item => item.id === 'recovery') || null
@@ -84,6 +96,16 @@ export function mutate({ puts = [], deletes = [], countChange = true }) {
 export const put = (store, value) => mutate({ puts: [{ store, value }] });
 export const remove = (store, id) => mutate({ deletes: [{ store, id }] });
 
+export function saveNutritionState(patch) {
+  const captured=structuredClone(patch);
+  return enqueue(async()=>{
+    const database=await openDB(),tx=database.transaction('metadata','readwrite'),completed=done(tx),store=tx.objectStore('metadata');
+    store.get('nutrition').onsuccess=event=>store.put({id:'nutrition',targets:structuredClone(DEFAULT_TARGETS),draft:null,...event.target.result,...captured});
+    store.get('state').onsuccess=event=>store.put({...event.target.result,id:'state',revision:(event.target.result?.revision||0)+1,changedAt:now()});
+    await completed;
+  });
+}
+
 // Resolve duplicates and restore archived records within the write transaction,
 // so simultaneous imports in different tabs keep a single exercise and its history.
 export function addCatalogExercise(item) {
@@ -112,6 +134,8 @@ export function snapshotFromData(data) {
     schemaVersion: SCHEMA_VERSION, exportedAt: now(),
     exercises: data.exercises, routines: data.routines, sessions: data.sessions,
     bodyMeasurements: data.bodyMeasurements || [],
+    foods: data.foods || [], foodMeals:data.foodMeals || [], foodDays:data.foodDays || [],
+    nutritionTargets:data.nutritionTargets || structuredClone(DEFAULT_TARGETS), foodDraft:data.foodDraft || null,
     workoutPreferences: { unit: data.preferences.unit }
   };
 }
@@ -148,13 +172,16 @@ export function replaceData(snapshot) {
         try {
           const oldState = current.metadata.find(item => item.id === 'state');
           const oldPreferences = current.metadata.find(item => item.id === 'preferences');
+          const nutrition=current.metadata.find(item=>item.id==='nutrition');
           const recovery = {
             schemaVersion: SCHEMA_VERSION, exportedAt: now(), exercises: current.exercises,
             routines: current.routines, sessions: current.sessions,
             bodyMeasurements: current.bodyMeasurements,
+            foods:current.foods,foodMeals:current.foodMeals,foodDays:current.foodDays,
+            nutritionTargets:nutrition?.targets || structuredClone(DEFAULT_TARGETS),foodDraft:nutrition?.draft || null,
             workoutPreferences: { unit: oldPreferences?.unit || 'kg' }
           };
-          for (const storeName of ['exercises', 'routines', 'sessions', 'bodyMeasurements']) {
+          for (const storeName of ['exercises', 'routines', 'sessions', 'bodyMeasurements','foods','foodMeals','foodDays']) {
             const store = tx.objectStore(storeName);
             store.clear();
             for (const value of incoming[storeName]) store.put(value);
@@ -162,10 +189,26 @@ export function replaceData(snapshot) {
           const metadata = tx.objectStore('metadata');
           metadata.put({ id: 'recovery', snapshot: recovery, restoredAt: now() });
           metadata.put({ id: 'preferences', ...incoming.workoutPreferences });
+          metadata.put({id:'nutrition',targets:incoming.nutritionTargets,draft:incoming.foodDraft});
           metadata.put({ id: 'state', revision: (oldState?.revision || 0) + 1, backedUpRevision: null, lastDriveBackupAt: null, lastExportAt: null, changedAt: now() });
         } catch { try { tx.abort(); } catch { /* Already aborted. */ } }
       };
     }
+    await completed;
+  });
+}
+
+// A meal and its day state commit together. The stable draft ID makes retries
+// idempotent; metadata is read within the transaction to retain current targets.
+export function saveFoodMeal(meal,{remove=false}={}) {
+  const captured=validateMeal(meal);
+  return enqueue(async()=>{
+    const database=await openDB(),tx=database.transaction(['foodMeals','foodDays','metadata'],'readwrite'),completed=done(tx);
+    if(remove)tx.objectStore('foodMeals').delete(captured.id);else tx.objectStore('foodMeals').put(captured);
+    tx.objectStore('foodDays').put(validateDay({id:captured.date,date:captured.date,complete:false,updatedAt:now()}));
+    const metadata=tx.objectStore('metadata');
+    metadata.get('nutrition').onsuccess=event=>{const current=event.target.result;metadata.put({id:'nutrition',...current,draft:current?.draft?.id===captured.id?null:(current?.draft||null)});};
+    metadata.get('state').onsuccess=event=>metadata.put({...event.target.result,id:'state',revision:(event.target.result?.revision||0)+1,changedAt:now()});
     await completed;
   });
 }
