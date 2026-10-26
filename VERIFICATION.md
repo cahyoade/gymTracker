@@ -2,6 +2,10 @@
 
 Checked in isolated Chromium/Edge browser contexts with disposable datasets. The user's workout records were not used or modified during testing.
 
+## Food layout and library access — 26 October 2026
+
+Cache `form-shell-v2.0.2`. Replaced wrapping date controls with a single-row previous/date/next navigator, removed the repeated date heading, and tightened the daily summary spacing. Food library is beside Add meal, with search and explicitly named edit/archive controls. The meal builder also exposes Add food. Nutrition browser verification now includes custom-food creation/search/edit/use and single-row date controls across eight phone/desktop theme states. No schema or saved-record changes are part of this layout update.
+
 ## Food and warteg meals — 26 October 2026
 
 Cache version `form-shell-v2.0.1`; IndexedDB and backup format version 3. Added 19 foods, empty-plate assembly, fractional servings and known conversions, independent saved meal drafts, atomic meal commits, food editing/archiving, effective-dated targets, complete-day states and Nutrition in Progress. Missing macros retain null values and partial coverage. Researched estimates are limited to suitable cooked rice, boiled egg and whole milk references, with assumptions/source links. Existing workout/body data survives migration.

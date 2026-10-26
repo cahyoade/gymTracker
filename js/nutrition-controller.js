@@ -2,10 +2,10 @@ import { id, now } from './model.js';
 import { todayLocal } from './measurements.js';
 import { put, saveNutritionState, saveFoodMeal } from './db.js';
 import { validateFood, validateMeal, validateTargets, targetsAt, quantityInServings, mealItem, shiftDate } from './nutrition.js';
-import { foodPage, foodResults, nutrientStats, foodLibrary, foodForm, targetForm, nutritionProgress } from './nutrition-ui.js';
+import { foodPage, foodResults, nutrientStats, foodLibrary, foodLibraryRows, foodForm, targetForm, nutritionProgress } from './nutrition-ui.js';
 
 export function createNutritionController(env) {
-  const state={date:todayLocal(),editing:false,query:'',group:'',selected:false,units:{},metric:'calories',range:7,end:todayLocal(),detail:todayLocal(),limit:20};
+  const state={date:todayLocal(),editing:false,query:'',libraryQuery:'',group:'',selected:false,units:{},metric:'calories',range:7,end:todayLocal(),detail:todayLocal(),limit:20};
   let draft=null,loaded=false,revision=0,saved=0,error=null,timer,saving=0,locked=false;
   const data=()=>env.getData();
   const status=()=>error?'Not saved · retry before closing':saving||revision!==saved?'Saving meal draft…':'Meal draft saved on this device';
@@ -25,7 +25,7 @@ export function createNutritionController(env) {
   }
   function showProgress(){const node=document.querySelector('#nutrition-progress');if(node)node.outerHTML=nutritionProgress(data(),state);}
   function pick(foodId){let item=draft.items.find(item=>item.foodId===foodId);if(!item){const food=data().foods.find(food=>food.id===foodId&&!food.archived);if(!food)throw new Error('This food is archived or unavailable.');item=mealItem(food,0);draft.items.push(item);}return item;}
-  function showLibrary(){env.showModal(foodLibrary(data()));}
+  function showLibrary(){env.showModal(foodLibrary(data(),state.libraryQuery));}
   function showBuilder(){env.render();document.querySelector('#meal-builder')?.scrollIntoView({block:'start'});}
   async function action(name,button){
     ensureLoaded();const kind=name.slice(4);if(locked)return;
@@ -36,7 +36,7 @@ export function createNutritionController(env) {
     }
     if(kind==='filter'){state.selected=button.dataset.selected==='true';results();document.querySelectorAll('[data-action="nut-filter"]').forEach(node=>node.setAttribute('aria-pressed',String((node.dataset.selected==='true')===state.selected)));return;}
     if(kind==='retry'){await flush();return;}
-    if(kind==='library'){showLibrary();return;}
+    if(kind==='library'){state.libraryQuery='';showLibrary();return;}
     if(kind==='food-new'){env.showModal(foodForm());return;}
     if(kind==='food-edit'){env.showModal(foodForm(data().foods.find(food=>food.id===button.dataset.id)));return;}
     if(kind==='modal-close'){env.closeModal();return;}
@@ -70,6 +70,7 @@ export function createNutritionController(env) {
   function input(target){
     if(!target.id?.startsWith('nut-')&&!target.hasAttribute('data-nut-quantity'))return false;
     ensureLoaded();if(locked)return true;
+    if(target.id==='nut-library-search'){state.libraryQuery=target.value;document.querySelector('#nut-library-results').innerHTML=foodLibraryRows(data(),state.libraryQuery);return true;}
     if(target.id==='nut-search'){state.query=target.value;results();return true;}
     if(target.id==='nut-meal-name'){draft.name=target.value;touch();return true;}
     if(target.hasAttribute('data-nut-quantity')){

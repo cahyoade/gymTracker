@@ -1,4 +1,4 @@
-const CACHE = 'form-shell-v2.0.1';
+const CACHE = 'form-shell-v2.0.2';
 const ASSETS = ['./', './index.html', './styles.css', './manifest.webmanifest', './js/app.js', './js/model.js', './js/db.js', './js/backup.js', './js/config.js', './js/google.js', './js/records.js', './js/theme.js', './js/progression.js', './js/measurements.js', './js/body-progress-ui.js', './js/strength.js', './js/strength-progress-ui.js', './js/catalog.js', './js/catalog-ui.js', './js/food-seeds.js', './js/nutrition.js', './js/nutrition-ui.js', './js/nutrition-controller.js', './data/exercises.json', './data/EXERCISES-LICENSE.txt', './icons/mark.svg', './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png'];
 const assetPaths = new Set(ASSETS.map(path => new URL(path, self.registration.scope).pathname));
 

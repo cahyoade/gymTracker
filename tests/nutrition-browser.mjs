@@ -23,6 +23,15 @@ try {
     await page.goto(`${origin}/#food`);await page.getByRole('heading',{name:'Food',exact:true}).waitFor();
     const data=await read();assert.equal(data.foods.length,19);assert.equal(data.foodMeals.length,0);assert.equal(data.sessions[0].notes,'Workout survives nutrition');assert.equal(data.bodyMeasurements[0].weight,62);assert.equal(data.state.revision,11);
   });
+  await check('visible food library creates, searches and edits custom foods for meal assembly',async()=>{
+    await page.getByRole('button',{name:'Food library',exact:true}).click();await action('food-new').click();
+    await page.locator('#nut-food-form [name="name"]').fill('Test tofu bowl');await page.locator('#nut-food-form [name="portion"]').fill('1 bowl');await page.locator('#nut-food-form [name="calories"]').fill('200');await page.locator('#nut-food-form [name="protein"]').fill('15');
+    await page.getByRole('button',{name:'Save food',exact:true}).click();await action('library').click();await page.locator('#nut-library-search').fill('tofu');assert.equal(await page.locator('#nut-library-results article').count(),1);
+    await page.getByRole('button',{name:'Edit Test tofu bowl',exact:true}).click();await page.locator('#nut-food-form [name="calories"]').fill('240');await page.getByRole('button',{name:'Save food',exact:true}).click();
+    const custom=(await read()).foods.find(food=>food.name==='Test tofu bowl');assert.equal(custom.calories,240);
+    await action('new').click();await page.locator('#nut-search').fill('tofu');await page.locator(`[data-action="nut-add"][data-id="${custom.id}"]`).click();await saved();assert.match(await page.locator('#nut-builder-totals').innerText(),/240/);
+    assert.equal(await page.locator('#meal-builder [data-action="nut-food-new"]').count(),1);await action('discard').click();
+  });
   await check('fresh plate, half servings, gram conversion, draft isolation and offline resume',async()=>{
     await action('new').click();await clickFood('rice');await page.locator('[data-nut-unit="food-rice"]').selectOption('g');await page.locator('[data-nut-quantity="food-rice"]').fill('200');
     await clickFood('chicken');await clickFood('tempe');await clickFood('beans');await page.locator('#nut-meal-name').fill('Warteg lunch');await saved();
@@ -87,6 +96,7 @@ try {
       await page.setViewportSize({width,height:900});await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;document.documentElement.dataset.customColors='true';document.documentElement.style.setProperty('--foreground-hue','220');document.documentElement.style.setProperty('--background-hue','90');},theme);
       const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1);assert.equal(overflow,false,`${width} ${theme}`);
       const targets=await page.locator('nav a').evaluateAll(nodes=>nodes.map(node=>({width:node.getBoundingClientRect().width,height:node.getBoundingClientRect().height})));assert.equal(targets.length,6);assert.ok(targets.every(t=>t.width>=44&&t.height>=44));
+      const dates=await page.locator('.food-datebar').evaluate(node=>{const controls=[...node.querySelectorAll('button,input')].map(control=>control.getBoundingClientRect());return {rows:new Set(controls.map(r=>Math.round(r.top))).size,minWidth:Math.min(...controls.map(r=>r.width)),minHeight:Math.min(...controls.map(r=>r.height))};});assert.equal(dates.rows,1);assert.ok(dates.minWidth>=44&&dates.minHeight>=44);
     }
     await page.setViewportSize({width:390,height:844});await page.locator('#meal-builder').scrollIntoViewIfNeeded();await page.screenshot({path:'test-results/nutrition-meal-mobile.png'});
     await page.locator('nav [data-view="progress"]').click();await page.screenshot({path:'test-results/nutrition-progress-mobile.png',fullPage:true});

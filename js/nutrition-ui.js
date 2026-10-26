@@ -1,5 +1,6 @@
 import { FOOD_GROUPS } from './food-seeds.js';
 import { NUTRIENTS, totals, targetsAt, nutritionSeries } from './nutrition.js';
+import { todayLocal } from './measurements.js';
 export const escape = value => String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const number = value => new Intl.NumberFormat(undefined,{maximumFractionDigits:2}).format(value);
 const button = (action,label,extra='',secondary=true) => `<button type="button" class="button ${secondary?'secondary':''}" data-action="nut-${action}" ${extra}>${label}</button>`;
@@ -14,11 +15,11 @@ export function nutrientStats(items,target={}) {
 export function foodPage(data,state,draft,status) {
   const meals=data.foodMeals.filter(meal=>meal.date===state.date).sort((a,b)=>a.updatedAt.localeCompare(b.updatedAt));
   const complete=data.foodDays.find(day=>day.date===state.date)?.complete;
-  return `<div class="page-heading"><div><h1>Food</h1><p class="muted">Assemble meals from your everyday foods. All values are estimates.</p></div>${button('new','+ Add meal','',false)}</div>
-  <div class="nutrition-controls">${button('prev','Previous day')}<label class="field">Food date<input type="date" id="nut-date" value="${state.date}"></label>${button('next','Next day')}${button('today','Today')}</div>
-  <div class="section-heading"><h2>${escape(labelDate(state.date))}</h2><span>${meals.length?(complete?'Complete':'In progress'):'No meals yet'}</span></div>
+  return `<div class="page-heading food-heading"><div><h1>Food</h1><p class="muted">Log meals and track daily nutrition.</p></div><div class="food-page-actions">${button('new','+ Add meal','',false)}${button('library','Food library')}</div></div>
+  <div class="food-datebar" role="group" aria-label="Food date navigation">${button('prev','‹','aria-label="Previous day" title="Previous day"')}<input type="date" id="nut-date" aria-label="Food date" value="${state.date}">${button('next','›','aria-label="Next day" title="Next day"')}</div>
+  <div class="food-day-heading"><h2>Daily intake</h2><div><span class="small-text muted">${state.date===todayLocal()?'Today · ':''}${meals.length?(complete?'Complete':'In progress'):'No meals yet'}</span>${state.date!==todayLocal()?button('today','Today'):''}</div></div>
   ${nutrientStats(meals.flatMap(meal=>meal.items),targetsAt(data.nutritionTargets,state.date))}
-  <div class="button-row">${button('library','Manage foods')}${button('targets','Edit targets')}${meals.length?button('complete',complete?'Reopen day':'Mark day complete'):''}</div>
+  <div class="button-row food-day-actions">${button('targets','Edit targets')}${meals.length?button('complete',complete?'Reopen day':'Mark day complete'):''}</div>
   ${draft && !state.editing?`<div class="notice nutrition-resume"><span>Unfinished meal · ${escape(labelDate(draft.date))}</span>${button('resume','Resume meal')}</div>`:''}
   ${state.editing&&draft?mealBuilder(data,state,draft,status):''}
   <section class="nutrition-meals"><h2>Logged meals</h2>${meals.length?meals.map(meal=>`<article class="meal-card"><div class="section-heading"><h3>${escape(meal.name)}</h3><div class="button-row">${button('edit','Edit',`data-id="${escape(meal.id)}"`)}${button('delete','Delete',`data-id="${escape(meal.id)}"`)}</div></div>${meal.items.map(item=>`<p>${escape(item.food.name)} · ${number(item.quantity)} × ${escape(item.food.portion)}</p>`).join('')}${nutrientStats(meal.items)}<p class="small-text muted">Saved ${escape(new Date(meal.updatedAt).toLocaleString())}</p></article>`).join(''):'<p class="muted">Choose Add meal to start with an empty plate.</p>'}</section>`;
@@ -27,7 +28,7 @@ export function mealBuilder(data,state,draft,status) {
   return `<section id="meal-builder" class="meal-builder"><div class="section-heading"><h2>${data.foodMeals.some(meal=>meal.id===draft.id)?'Edit meal':'Assemble a meal'}</h2>${button('pause','Save & close')}</div>
   <p class="muted small-text">Logging for ${escape(labelDate(draft.date))}. Tap a dish to add one base serving. Adjust by halves or enter another amount.</p>
   <label class="field">Meal name (optional)<input id="nut-meal-name" maxlength="160" value="${escape(draft.name)}" placeholder="Meal"></label>
-  <label class="field">Find a food<input type="search" id="nut-search" value="${escape(state.query)}" placeholder="Rice, chicken, vegetables…"></label>
+  <div class="food-builder-library"><h3>Choose foods</h3>${button('food-new','+ Add food')}</div><label class="field">Find a food<input type="search" id="nut-search" value="${escape(state.query)}" placeholder="Rice, chicken, vegetables…"></label>
   <div class="nutrition-controls"><label class="field">Food group<select id="nut-group"><option value="">All groups</option>${FOOD_GROUPS.map(group=>`<option ${state.group===group?'selected':''}>${escape(group)}</option>`).join('')}</select></label><div class="segmented">${button('filter','All foods',`aria-pressed="${!state.selected}"`)}${button('filter','Selected',`data-selected="true" aria-pressed="${state.selected}"`)}</div></div>
   <div id="nut-food-results">${foodResults(data,state,draft)}</div>
   <div id="nut-builder-totals" aria-live="polite">${nutrientStats(draft.items,targetsAt(data.nutritionTargets,draft.date))}</div>
@@ -47,8 +48,13 @@ export function foodResults(data,state,draft) {
     ${item?`<div class="portion-controls">${button('minus','−½',`data-id="${escape(food.id)}" aria-label="Remove half serving of ${escape(food.name)}"`)}<label>Quantity<input type="number" min="0" step="any" inputmode="decimal" data-nut-quantity="${escape(food.id)}" aria-label="${escape(food.name)} quantity" value="${escape(displayed)}"></label>${button('plus','+½',`data-id="${escape(food.id)}" aria-label="Add half serving of ${escape(food.name)}"`)}<label>Unit<select data-nut-unit="${escape(food.id)}" aria-label="${escape(food.name)} quantity unit"><option value="servings">Servings</option>${food.baseAmount?`<option value="${food.baseUnit}" ${unit===food.baseUnit?'selected':''}>${food.baseUnit}</option>`:''}</select></label></div>`:''}</article>`;
   }).join(''):'<p class="muted">No matching foods. Add custom foods from Manage foods.</p>';
 }
-export function foodLibrary(data) {
-  return `<h2 id="modal-title">Saved foods</h2><p class="muted">Changes apply to future selections; logged meals keep their original estimates.</p>${button('food-new','+ Add food','',false)}<div class="food-library">${data.foods.map(food=>`<article><div><strong>${escape(food.name)}</strong><p class="small-text muted">${escape(food.portion)}${food.archived?' · Archived':''}</p></div><div class="button-row">${button('food-edit','Edit',`data-id="${escape(food.id)}"`)}${button('food-archive',food.archived?'Unarchive':'Archive',`data-id="${escape(food.id)}"`)}</div></article>`).join('')}</div>${button('modal-close','Close')}`;
+export function foodLibrary(data,query='') {
+  return `<h2 id="modal-title">Food library</h2><p class="muted">Add foods or edit saved portions and nutrients. Logged meals keep their original estimates.</p>${button('food-new','+ Add food','',false)}<label class="field food-library-search">Find a saved food<input type="search" id="nut-library-search" placeholder="Search saved foods" value="${escape(query)}"></label><div class="food-library" id="nut-library-results">${foodLibraryRows(data,query)}</div>${button('modal-close','Close')}`;
+}
+export function foodLibraryRows(data,query='') {
+  const needle=query.toLocaleLowerCase().trim();
+  const matches=data.foods.filter(food=>`${food.name} ${food.group}`.toLocaleLowerCase().includes(needle));
+  return matches.length?matches.map(food=>`<article><div><strong>${escape(food.name)}</strong><p class="small-text muted">${escape(food.portion)}${food.archived?' · Archived':''}</p></div><div class="button-row">${button('food-edit','Edit',`data-id="${escape(food.id)}" aria-label="Edit ${escape(food.name)}"`)}${button('food-archive',food.archived?'Unarchive':'Archive',`data-id="${escape(food.id)}" aria-label="${food.archived?'Unarchive':'Archive'} ${escape(food.name)}"`)}</div></article>`).join(''):'<p class="muted">No matching saved foods. Add a food with the button above.</p>';
 }
 export function foodForm(food={}) {
   return `<h2 id="modal-title">${food.id?'Edit food':'Add food'}</h2><form id="nut-food-form" data-id="${escape(food.id||'')}">
